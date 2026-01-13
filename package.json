@@ -1,0 +1,16 @@
+{
+  "name": "timer-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension timer with Vue.js",
+  "scripts": {
+    "build": "echo 'Extension is ready to use'"
+  },
+  "keywords": [
+    "chrome-extension",
+    "timer",
+    "vue"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
