@@ -13,6 +13,30 @@ A picture-in-picture timer countdown extension for Google Chrome that displays a
 
 ## Installation
 
+### Option 1: Install from GitHub
+
+1. **Clone or Download the Repository**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/TimerApp.git
+   cd TimerApp
+   ```
+   Or download as ZIP from GitHub and extract it.
+
+2. **Open Chrome Extensions Page**
+   - Open Google Chrome
+   - Navigate to `chrome://extensions/`
+   - Or go to: Menu (☰) → More Tools → Extensions
+
+3. **Enable Developer Mode**
+   - Toggle the "Developer mode" switch in the top-right corner
+
+4. **Load the Extension**
+   - Click "Load unpacked" button
+   - Select the `TimerApp` folder (the folder containing `manifest.json`)
+   - The extension should now appear in your extensions list
+
+### Option 2: Direct Installation
+
 1. **Open Chrome Extensions Page**
    - Open Google Chrome
    - Navigate to `chrome://extensions/`
