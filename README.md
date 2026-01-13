@@ -17,8 +17,8 @@ A picture-in-picture timer countdown extension for Google Chrome that displays a
 
 1. **Clone or Download the Repository**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/TimerApp.git
-   cd TimerApp
+   git clone https://github.com/Lakshita7/Timer-Extension.git
+   cd Timer-Extension
    ```
    Or download as ZIP from GitHub and extract it.
 
