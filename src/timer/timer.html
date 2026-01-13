@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +8,28 @@
 </head>
 <body>
   <div id="app">
-    <div class="timer-container"></div>
+    <div class="timer-container">
+      <div class="drag-handle">
+        <div class="drag-indicator"></div>
+        <span>⏱️ Timer</span>
+      </div>
+      
+      <div class="timer-display">
+        <div class="time" id="timeDisplay">0:00</div>
+        <div class="status-text" id="statusText">Ready</div>
+      </div>
+
+      <div class="controls">
+        <button class="control-btn pause-btn" id="pauseBtn">
+          <span id="pauseIcon">⏸</span>
+        </button>
+        <button class="control-btn reset-btn" id="resetBtn">
+          <span>↻</span>
+        </button>
+      </div>
+    </div>
   </div>
+
   <script src="timer.js"></script>
 </body>
 </html>
-

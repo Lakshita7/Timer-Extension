@@ -1,249 +1,85 @@
+// Popup script for timer extension
 document.addEventListener('DOMContentLoaded', () => {
-  const timerStatusContainer = document.getElementById('timerStatus');
-  const timerOptionsContainer = document.getElementById('timerOptions');
-  const timerDisplay = document.getElementById('timerDisplay');
-  const pauseBtn = document.getElementById('pauseBtn');
+  const timerButtons = document.querySelectorAll('.timer-btn[data-duration]');
   const stopBtn = document.getElementById('stopBtn');
-  const buttons = document.querySelectorAll('.timer-option[data-minutes]');
+  const status = document.getElementById('status');
+  const timerDisplay = document.getElementById('timerDisplay');
 
-  let updateInterval = null;
-
-  // Check timer state and update UI
-  updateTimerStatus();
-
-  // Timer duration buttons
-  buttons.forEach(button => {
-    button.addEventListener('click', () => {
-      const minutes = parseInt(button.getAttribute('data-minutes'));
-      startTimer(minutes);
+  // Add click handlers for timer buttons
+  timerButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const duration = parseInt(btn.dataset.duration);
+      startTimer(duration);
     });
   });
 
-  // Control buttons
-  pauseBtn.addEventListener('click', () => {
-    togglePause();
-  });
-
+  // Stop button handler
   stopBtn.addEventListener('click', () => {
     stopTimer();
   });
 
-  async function updateTimerStatus() {
-    try {
-      const result = await chrome.storage.local.get([
-        'timerActive', 
-        'timerTotalSeconds', 
-        'timerStartTime',
-        'timerPaused',
-        'timerPausedTime',
-        'timerPausedSeconds'
-      ]);
+  // Check current timer state on popup open
+  checkTimerState();
 
-      if (result.timerActive && result.timerTotalSeconds) {
-        // Calculate remaining time
-        let remainingSeconds;
-        if (result.timerPaused && result.timerPausedSeconds !== undefined) {
-          // Timer is paused
-          remainingSeconds = result.timerPausedSeconds;
-        } else {
-          // Timer is running
-          const elapsed = Math.floor((Date.now() - (result.timerStartTime || Date.now())) / 1000);
-          remainingSeconds = Math.max(0, result.timerTotalSeconds - elapsed);
-        }
-
-        if (remainingSeconds > 0) {
-          showTimerStatus(remainingSeconds, result.timerPaused || false);
-          startUpdateInterval(result);
-        } else {
-          // Timer finished
-          showTimerOptions();
-          chrome.storage.local.set({ timerActive: false });
-        }
-      } else {
-        showTimerOptions();
-      }
-    } catch (error) {
-      console.error('Error updating timer status:', error);
-      showTimerOptions();
-    }
-  }
-
-  function showTimerStatus(remainingSeconds, isPaused) {
-    timerStatusContainer.classList.add('active');
-    timerOptionsContainer.classList.remove('active');
-    
-    updateDisplay(remainingSeconds);
-    
-    if (isPaused) {
-      pauseBtn.textContent = 'Resume';
-      pauseBtn.className = 'control-btn resume-btn';
-    } else {
-      pauseBtn.textContent = 'Pause';
-      pauseBtn.className = 'control-btn pause-btn';
-    }
-  }
-
-  function showTimerOptions() {
-    timerStatusContainer.classList.remove('active');
-    timerOptionsContainer.classList.add('active');
-    
-    if (updateInterval) {
-      clearInterval(updateInterval);
-      updateInterval = null;
-    }
-  }
-
-  function updateDisplay(remainingSeconds) {
-    const minutes = Math.floor(remainingSeconds / 60);
-    const seconds = remainingSeconds % 60;
-    const mins = String(minutes).padStart(2, '0');
-    const secs = String(seconds).padStart(2, '0');
-    timerDisplay.textContent = `${mins}:${secs}`;
-  }
-
-  function startUpdateInterval(result) {
-    if (updateInterval) {
-      clearInterval(updateInterval);
-    }
-
-    if (!result.timerPaused) {
-      // Only update if not paused
-      updateInterval = setInterval(async () => {
-        const state = await chrome.storage.local.get(['timerActive', 'timerTotalSeconds', 'timerStartTime', 'timerPaused', 'timerPausedSeconds']);
-        
-        if (state.timerActive && !state.timerPaused) {
-          const elapsed = Math.floor((Date.now() - (state.timerStartTime || Date.now())) / 1000);
-          const remainingSeconds = Math.max(0, state.timerTotalSeconds - elapsed);
-          
-          if (remainingSeconds > 0) {
-            updateDisplay(remainingSeconds);
-          } else {
-            showTimerOptions();
-            chrome.storage.local.set({ timerActive: false });
-            clearInterval(updateInterval);
-          }
-        }
-      }, 1000);
-    }
-  }
-
-  async function togglePause() {
-    try {
-      const result = await chrome.storage.local.get(['timerActive', 'timerPaused', 'timerTotalSeconds', 'timerStartTime', 'timerPausedSeconds']);
-      
-      if (!result.timerActive) return;
-
-      const newPausedState = !result.timerPaused;
-      let pausedSeconds = result.timerPausedSeconds;
-
-      if (newPausedState) {
-        // Pausing
-        const elapsed = Math.floor((Date.now() - (result.timerStartTime || Date.now())) / 1000);
-        pausedSeconds = Math.max(0, result.timerTotalSeconds - elapsed);
-        
-        await chrome.storage.local.set({
-          timerPaused: true,
-          timerPausedTime: Date.now(),
-          timerPausedSeconds: pausedSeconds
-        });
-
-        pauseBtn.textContent = 'Resume';
-        pauseBtn.className = 'control-btn resume-btn';
-        
-        if (updateInterval) {
-          clearInterval(updateInterval);
-        }
-      } else {
-        // Resuming
-        const pausedSeconds = result.timerPausedSeconds || result.timerTotalSeconds;
-        
-        await chrome.storage.local.set({
-          timerPaused: false,
-          timerStartTime: Date.now(),
-          timerTotalSeconds: pausedSeconds,
-          timerPausedTime: null,
-          timerPausedSeconds: null
-        });
-
-        pauseBtn.textContent = 'Pause';
-        pauseBtn.className = 'control-btn pause-btn';
-        
-        startUpdateInterval({ timerPaused: false });
-      }
-
-      // Send message to all tabs
-      const tabs = await chrome.tabs.query({});
-      for (const tab of tabs) {
-        if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-          try {
-            await chrome.tabs.sendMessage(tab.id, {
-              action: newPausedState ? 'pauseTimer' : 'resumeTimer'
-            });
-          } catch (error) {
-            // Ignore errors
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling pause:', error);
-    }
-  }
-
-  async function startTimer(minutes) {
-    try {
-      // Store timer state
-      await chrome.storage.local.set({
-        timerActive: true,
-        timerMinutes: minutes,
-        timerStartTime: Date.now(),
-        timerTotalSeconds: minutes * 60,
-        timerPaused: false,
-        timerPausedTime: null,
-        timerPausedSeconds: null
-      });
-
-      // Show overlay on current tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.id && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-        try {
-          await chrome.tabs.sendMessage(tab.id, {
-            action: 'showTimerOverlay'
-          });
-        } catch (error) {
-          console.error('Error showing overlay:', error);
-        }
-      }
-
-      updateTimerStatus();
-    } catch (error) {
-      console.error('Error in startTimer:', error);
-      alert('Error: ' + error.message);
-    }
-  }
-
-  async function stopTimer() {
-    try {
-      // Clear timer state
-      await chrome.storage.local.set({
-        timerActive: false,
-        timerPaused: false
-      });
-
-      // Hide overlay on current tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.id && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-        try {
-          await chrome.tabs.sendMessage(tab.id, {
-            action: 'hideTimerOverlay'
-          });
-        } catch (error) {
-          // Ignore errors
-        }
-      }
-
-      showTimerOptions();
-    } catch (error) {
-      console.error('Error in stopTimer:', error);
-    }
-  }
+  // Update display every second
+  setInterval(checkTimerState, 1000);
 });
+
+async function startTimer(duration) {
+  try {
+    // Start the timer in the background - it will show on all tabs automatically
+    await chrome.runtime.sendMessage({
+      action: 'startTimer',
+      duration: duration
+    });
+  } catch (error) {
+    console.error('Error starting timer:', error);
+  }
+}
+
+async function stopTimer() {
+  try {
+    // Stop timer in background - it will hide on all tabs automatically
+    await chrome.runtime.sendMessage({
+      action: 'stopTimer'
+    });
+  } catch (error) {
+    console.error('Error stopping timer:', error);
+  }
+}
+
+async function checkTimerState() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getTimerState' });
+    
+    if (response && response.state) {
+      const state = response.state;
+      
+      if (state.isRunning && state.remainingTime > 0) {
+        status.classList.remove('hidden');
+        updateDisplay(state.remainingTime, state.isPaused);
+      } else {
+        status.classList.add('hidden');
+      }
+    }
+  } catch (error) {
+    console.error('Error getting timer state:', error);
+  }
+}
+
+function updateDisplay(seconds, isPaused) {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`;
+  
+  timerDisplay.textContent = timeStr;
+  
+  const statusLabel = document.getElementById('statusLabel');
+  if (statusLabel) {
+    if (isPaused) {
+      statusLabel.textContent = 'Timer Paused';
+    } else {
+      statusLabel.textContent = 'Timer Active';
+    }
+  }
+}

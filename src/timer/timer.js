@@ -1,175 +1,110 @@
-let totalSeconds = 0;
-let minutes = 0;
-let seconds = 0;
-let intervalId = null;
-let isRunning = false;
-let isFinished = false;
+// Timer overlay script
+let currentState = {
+  isRunning: false,
+  isPaused: false,
+  remainingTime: 0
+};
 
-// DOM elements
-let timerDisplay = null;
-let timerLabel = null;
-let pauseBtn = null;
-let resetBtn = null;
-let container = null;
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+  // Get references to DOM elements
+  const timeDisplay = document.getElementById('timeDisplay');
+  const statusText = document.getElementById('statusText');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const pauseIcon = document.getElementById('pauseIcon');
 
-function init() {
-  // Get or create the timer container
-  const app = document.getElementById('app');
-  container = document.querySelector('.timer-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.className = 'timer-container';
-    if (app) {
-      app.appendChild(container);
-    } else {
-      document.body.appendChild(container);
-    }
-  }
-
-  // Create label
-  timerLabel = document.createElement('div');
-  timerLabel.className = 'timer-label';
-  timerLabel.textContent = 'Time Remaining';
-
-  // Create display
-  timerDisplay = document.createElement('div');
-  timerDisplay.className = 'timer-display';
-  timerDisplay.textContent = '00:00';
-
-  // Create controls container
-  const controlsContainer = document.createElement('div');
-  controlsContainer.className = 'timer-controls';
-
-  // Create pause button
-  pauseBtn = document.createElement('button');
-  pauseBtn.className = 'timer-btn';
-  pauseBtn.textContent = 'Pause';
-  pauseBtn.addEventListener('click', pauseTimer);
-
-  // Create reset button
-  resetBtn = document.createElement('button');
-  resetBtn.className = 'timer-btn';
-  resetBtn.textContent = 'Reset';
-  resetBtn.addEventListener('click', resetTimer);
-
-  controlsContainer.appendChild(pauseBtn);
-  controlsContainer.appendChild(resetBtn);
-
-  // Append all elements
-  container.appendChild(timerLabel);
-  container.appendChild(timerDisplay);
-  container.appendChild(controlsContainer);
-
-  // Listen for messages from content script
-  window.addEventListener('message', (event) => {
-    if (event.data.action === 'initTimer') {
-      startTimer(
-        event.data.minutes || 0, 
-        event.data.seconds || 0, 
-        event.data.totalSeconds || null
-      );
-    } else if (event.data.action === 'pauseTimer') {
-      if (isRunning) {
-        pauseTimer();
+  // Pause/Resume button click handler
+  pauseBtn.addEventListener('click', async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getTimerState' });
+      if (response && response.state) {
+        if (response.state.isPaused) {
+          await chrome.runtime.sendMessage({ action: 'resumeTimer' });
+        } else {
+          await chrome.runtime.sendMessage({ action: 'pauseTimer' });
+        }
       }
-    } else if (event.data.action === 'resumeTimer') {
-      if (!isRunning && totalSeconds > 0) {
-        pauseTimer(); // toggle to resume
-      }
+    } catch (error) {
+      console.error('Error toggling pause:', error);
     }
   });
-}
 
-function startTimer(minutesInput, secondsInput = 0, totalSecondsInput = null) {
-  if (totalSecondsInput !== null) {
-    totalSeconds = totalSecondsInput;
-    minutes = minutesInput;
-    seconds = secondsInput;
-  } else {
-    totalSeconds = minutesInput * 60;
-    minutes = minutesInput;
-    seconds = 0;
-  }
-  
-  isRunning = true;
-  isFinished = false;
+  // Reset button click handler
+  resetBtn.addEventListener('click', async () => {
+    try {
+      await chrome.runtime.sendMessage({ action: 'resetTimer' });
+    } catch (error) {
+      console.error('Error resetting timer:', error);
+    }
+  });
 
-  if (intervalId) {
-    clearInterval(intervalId);
-  }
+  // Listen for state updates from parent window (content script)
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'updateState') {
+      updateDisplay(event.data.state);
+    }
+  });
 
-  updateDisplay();
-  updateLabel('Time Remaining');
-  container.classList.remove('timer-finished');
+  // Request initial state from background
+  (async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getTimerState' });
+      if (response && response.state) {
+        updateDisplay(response.state);
+      }
+    } catch (error) {
+      console.error('Error getting initial state:', error);
+    }
+  })();
 
-  intervalId = setInterval(() => {
-    if (totalSeconds > 0) {
-      totalSeconds--;
-      minutes = Math.floor(totalSeconds / 60);
-      seconds = totalSeconds % 60;
-      updateDisplay();
-    } else {
-      finishTimer();
+  // Update display every second
+  setInterval(async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getTimerState' });
+      if (response && response.state) {
+        updateDisplay(response.state);
+      }
+    } catch (error) {
+      console.error('Error updating display:', error);
     }
   }, 1000);
-}
+});
 
-function pauseTimer() {
-  if (isRunning) {
-    clearInterval(intervalId);
-    isRunning = false;
-    pauseBtn.textContent = 'Resume';
-  } else {
-    intervalId = setInterval(() => {
-      if (totalSeconds > 0) {
-        totalSeconds--;
-        minutes = Math.floor(totalSeconds / 60);
-        seconds = totalSeconds % 60;
-        updateDisplay();
-      } else {
-        finishTimer();
-      }
-    }, 1000);
-    isRunning = true;
-    pauseBtn.textContent = 'Pause';
+function updateDisplay(state) {
+  if (!state) return;
+
+  const timeDisplay = document.getElementById('timeDisplay');
+  const statusText = document.getElementById('statusText');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const pauseIcon = document.getElementById('pauseIcon');
+
+  // Check if timer is finished or not running
+  if (!state.isRunning || state.remainingTime <= 0) {
+    timeDisplay.textContent = '0:00';
+    statusText.textContent = state.remainingTime === 0 && state.isRunning === false ? 'Timer Finished!' : 'Ready';
+    statusText.classList.add('finished');
+    pauseBtn.disabled = false;
+    return;
   }
-}
 
-function resetTimer() {
-  clearInterval(intervalId);
-  totalSeconds = 0;
-  minutes = 0;
-  seconds = 0;
-  isRunning = false;
-  isFinished = false;
-  pauseBtn.textContent = 'Pause';
-  updateDisplay();
-  updateLabel('Time Remaining');
-  container.classList.remove('timer-finished');
-}
+  // Update time display
+  const minutes = Math.floor(state.remainingTime / 60);
+  const seconds = state.remainingTime % 60;
+  const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  
+  timeDisplay.textContent = timeStr;
 
-function finishTimer() {
-  clearInterval(intervalId);
-  isRunning = false;
-  isFinished = true;
-  pauseBtn.textContent = 'Pause';
-  updateLabel('Timer Finished!');
-  container.classList.add('timer-finished');
-}
+  // Update status text
+  statusText.classList.remove('finished');
+  
+  if (state.isPaused) {
+    statusText.textContent = 'Paused';
+    pauseIcon.textContent = '▶';
+  } else {
+    statusText.textContent = 'Running';
+    pauseIcon.textContent = '⏸';
+  }
 
-function updateDisplay() {
-  const mins = String(minutes).padStart(2, '0');
-  const secs = String(seconds).padStart(2, '0');
-  timerDisplay.textContent = `${mins}:${secs}`;
-}
-
-function updateLabel(text) {
-  timerLabel.textContent = text;
-}
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
+  pauseBtn.disabled = false;
 }
