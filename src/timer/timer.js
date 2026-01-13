@@ -5,6 +5,7 @@ let currentState = {
   remainingTime: 0
 };
 
+let totalTime = null;
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Get references to DOM elements
@@ -78,32 +79,54 @@ function updateDisplay(state) {
   const statusText = document.getElementById('statusText');
   const pauseBtn = document.getElementById('pauseBtn');
   const pauseIcon = document.getElementById('pauseIcon');
+  const progressFill = document.getElementById('progressFill');
 
-  // Check if timer is finished or not running
+  // Capture total time once
+  if (state.isRunning && totalTime === null) {
+    totalTime = state.remainingTime;
+  }
+
+  // Timer finished or reset
   if (!state.isRunning || state.remainingTime <= 0) {
     timeDisplay.textContent = '0:00';
-    statusText.textContent = state.remainingTime === 0 && state.isRunning === false ? 'Timer Finished!' : 'Ready';
+    statusText.textContent =
+      state.remainingTime === 0 && state.isRunning === false
+        ? 'Timer Finished!'
+        : 'Ready';
+
     statusText.classList.add('finished');
     pauseBtn.disabled = false;
+
+    // Fill bar completely
+    if (progressFill) progressFill.style.width = '100%';
+
+    totalTime = null;
     return;
   }
 
-  // Update time display
+  // Time formatting
   const minutes = Math.floor(state.remainingTime / 60);
   const seconds = state.remainingTime % 60;
-  const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  
-  timeDisplay.textContent = timeStr;
+  timeDisplay.textContent = `${minutes}:${seconds
+    .toString()
+    .padStart(2, '0')}`;
 
-  // Update status text
+  // Status
   statusText.classList.remove('finished');
-  
+
   if (state.isPaused) {
     statusText.textContent = 'Paused';
     pauseIcon.textContent = '▶';
   } else {
     statusText.textContent = 'Running';
     pauseIcon.textContent = '⏸';
+  }
+
+  // Progress update
+  if (progressFill && totalTime) {
+    const progress =
+      ((totalTime - state.remainingTime) / totalTime) * 100;
+    progressFill.style.width = `${Math.min(progress, 100)}%`;
   }
 
   pauseBtn.disabled = false;
