@@ -1,0 +1,39 @@
+#timer-extension-overlay-container {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 320px !important;
+  min-height: 200px !important;
+  background: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+  border: 1px solid #ddd !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+#timer-extension-drag-handle {
+  width: 100% !important;
+  height: 40px !important;
+  background: #4CAF50 !important;
+  cursor: move !important;
+  border-radius: 8px 8px 0 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: white !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  user-select: none !important;
+}
+
+#timer-extension-iframe {
+  width: 100% !important;
+  border: none !important;
+  border-radius: 0 0 8px 8px !important;
+  background: transparent !important;
+  display: block !important;
+  min-height: 160px !important;
+}
+

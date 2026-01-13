@@ -5,7 +5,8 @@
   "description": "A picture-in-picture timer countdown extension",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "action": {
     "default_popup": "src/popup/popup.html",
@@ -19,12 +20,13 @@
     {
       "matches": ["<all_urls>"],
       "js": ["src/content/content.js"],
+      "css": ["src/content/overlay.css"],
       "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/timer/timer.html", "src/timer/timer.css", "src/timer/timer.js"],
+      "resources": ["src/popup/popup.html", "src/popup/popup.js"],
       "matches": ["<all_urls>"]
     }
   ]

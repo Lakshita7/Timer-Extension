@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const timerDisplay = document.getElementById('timerDisplay');
   const pauseBtn = document.getElementById('pauseBtn');
   const stopBtn = document.getElementById('stopBtn');
+  const closeBtn = document.getElementById('closeBtn');
   const buttons = document.querySelectorAll('.timer-option[data-minutes]');
 
   let updateInterval = null;
@@ -26,6 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   stopBtn.addEventListener('click', () => {
     stopTimer();
+  });
+
+  // Close button
+  closeBtn.addEventListener('click', () => {
+    window.close();
   });
 
   async function updateTimerStatus() {
@@ -69,8 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showTimerStatus(remainingSeconds, isPaused) {
-    timerStatusContainer.classList.add('active');
-    timerOptionsContainer.classList.remove('active');
+    timerStatusContainer.style.display = 'block';
+    timerOptionsContainer.style.display = 'none';
     
     updateDisplay(remainingSeconds);
     
@@ -84,8 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showTimerOptions() {
-    timerStatusContainer.classList.remove('active');
-    timerOptionsContainer.classList.add('active');
+    timerStatusContainer.style.display = 'none';
+    timerOptionsContainer.style.display = 'block';
     
     if (updateInterval) {
       clearInterval(updateInterval);
@@ -134,12 +140,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!result.timerActive) return;
 
       const newPausedState = !result.timerPaused;
-      let pausedSeconds = result.timerPausedSeconds;
 
       if (newPausedState) {
         // Pausing
         const elapsed = Math.floor((Date.now() - (result.timerStartTime || Date.now())) / 1000);
-        pausedSeconds = Math.max(0, result.timerTotalSeconds - elapsed);
+        const pausedSeconds = Math.max(0, result.timerTotalSeconds - elapsed);
         
         await chrome.storage.local.set({
           timerPaused: true,
@@ -170,20 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         startUpdateInterval({ timerPaused: false });
       }
-
-      // Send message to all tabs
-      const tabs = await chrome.tabs.query({});
-      for (const tab of tabs) {
-        if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-          try {
-            await chrome.tabs.sendMessage(tab.id, {
-              action: newPausedState ? 'pauseTimer' : 'resumeTimer'
-            });
-          } catch (error) {
-            // Ignore errors
-          }
-        }
-      }
     } catch (error) {
       console.error('Error toggling pause:', error);
     }
@@ -202,18 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
         timerPausedSeconds: null
       });
 
-      // Show overlay on current tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.id && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-        try {
-          await chrome.tabs.sendMessage(tab.id, {
-            action: 'showTimerOverlay'
-          });
-        } catch (error) {
-          console.error('Error showing overlay:', error);
-        }
-      }
-
       updateTimerStatus();
     } catch (error) {
       console.error('Error in startTimer:', error);
@@ -229,21 +208,10 @@ document.addEventListener('DOMContentLoaded', () => {
         timerPaused: false
       });
 
-      // Hide overlay on current tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.id && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-        try {
-          await chrome.tabs.sendMessage(tab.id, {
-            action: 'hideTimerOverlay'
-          });
-        } catch (error) {
-          // Ignore errors
-        }
-      }
-
       showTimerOptions();
     } catch (error) {
       console.error('Error in stopTimer:', error);
     }
   }
 });
+

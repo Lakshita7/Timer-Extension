@@ -1,141 +1,172 @@
-let timerFrame = null;
+let overlayContainer = null;
 let dragHandle = null;
+let timerIframe = null;
+
+// Check for existing timer when content script loads
+checkForExistingTimer();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'startTimer') {
-    startTimer(message.minutes);
-  } else if (message.action === 'stopTimer') {
-    stopTimer();
+  console.log('Content script received message:', message);
+  if (message.action === 'showTimerOverlay') {
+    showTimerOverlay();
+    sendResponse({ success: true });
+  } else if (message.action === 'hideTimerOverlay') {
+    hideTimerOverlay();
+    sendResponse({ success: true });
   }
+  return true;
 });
 
-function startTimer(minutes) {
-  // Remove existing timer if any
-  if (timerFrame) {
-    timerFrame.remove();
-    timerFrame = null;
+async function checkForExistingTimer() {
+  try {
+    const result = await chrome.storage.local.get(['timerOverlayVisible']);
+    if (result.timerOverlayVisible) {
+      showTimerOverlay();
+    }
+  } catch (error) {
+    console.error('Error checking for existing overlay:', error);
   }
-
-  // Create container for the timer
-  const container = document.createElement('div');
-  container.id = 'timer-extension-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 250px;
-    height: 180px;
-    z-index: 999999;
-    pointer-events: auto;
-  `;
-
-  // Create drag handle (header bar)
-  dragHandle = document.createElement('div');
-  dragHandle.id = 'timer-drag-handle';
-  dragHandle.style.cssText = `
-    width: 100%;
-    height: 30px;
-    background: #4CAF50;
-    cursor: move;
-    border-radius: 8px 8px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    user-select: none;
-  `;
-  dragHandle.textContent = '⏱️ Drag to move';
-
-  // Create iframe for the timer
-  timerFrame = document.createElement('iframe');
-  timerFrame.id = 'timer-extension-overlay';
-  timerFrame.src = chrome.runtime.getURL('src/timer/timer.html');
-  timerFrame.style.cssText = `
-    width: 100%;
-    height: calc(100% - 30px);
-    border: none;
-    border-radius: 0 0 8px 8px;
-    background: transparent;
-    display: block;
-  `;
-
-  container.appendChild(dragHandle);
-  container.appendChild(timerFrame);
-  document.body.appendChild(container);
-
-  // Wait for iframe to load, then send timer data
-  timerFrame.onload = () => {
-    timerFrame.contentWindow.postMessage({
-      action: 'initTimer',
-      minutes: minutes
-    }, '*');
-  };
-
-  // Make it draggable
-  makeDraggable(container, dragHandle);
 }
 
-function stopTimer() {
-  const container = document.getElementById('timer-extension-container');
-  if (container) {
-    container.remove();
-    timerFrame = null;
-    dragHandle = null;
+async function showTimerOverlay() {
+  // Remove existing overlay if any
+  const existing = document.getElementById('timer-extension-overlay-container');
+  if (existing) {
+    existing.remove();
   }
+
+  // Get saved position or use default
+  let savedPosition = { x: null, y: null };
+  try {
+    const result = await chrome.storage.local.get(['timerOverlayPosition']);
+    if (result.timerOverlayPosition) {
+      savedPosition = result.timerOverlayPosition;
+    }
+  } catch (error) {
+    console.error('Error loading overlay position:', error);
+  }
+
+  // Calculate default position (top-right corner)
+  const defaultX = savedPosition.x !== null ? savedPosition.x : window.innerWidth - 340; // 320px width + 20px margin
+  const defaultY = savedPosition.y !== null ? savedPosition.y : 20;
+
+  // Create container
+  overlayContainer = document.createElement('div');
+  overlayContainer.id = 'timer-extension-overlay-container';
+  overlayContainer.style.left = defaultX + 'px';
+  overlayContainer.style.top = defaultY + 'px';
+
+  // Create drag handle
+  dragHandle = document.createElement('div');
+  dragHandle.id = 'timer-extension-drag-handle';
+  dragHandle.textContent = '⏱️ Drag to move';
+
+  // Create iframe
+  timerIframe = document.createElement('iframe');
+  timerIframe.id = 'timer-extension-iframe';
+  timerIframe.src = chrome.runtime.getURL('src/popup/popup.html');
+
+  overlayContainer.appendChild(dragHandle);
+  overlayContainer.appendChild(timerIframe);
+  
+  if (document.body) {
+    document.body.appendChild(overlayContainer);
+    makeDraggable(overlayContainer, dragHandle);
+    
+    // Mark overlay as visible
+    chrome.storage.local.set({ timerOverlayVisible: true });
+  }
+}
+
+function hideTimerOverlay() {
+  const overlay = document.getElementById('timer-extension-overlay-container');
+  if (overlay) {
+    overlay.remove();
+    overlayContainer = null;
+    dragHandle = null;
+    timerIframe = null;
+  }
+  chrome.storage.local.set({ timerOverlayVisible: false });
 }
 
 function makeDraggable(element, handle) {
   let isDragging = false;
-  let currentX;
-  let currentY;
+  let currentX = 0;
+  let currentY = 0;
   let initialX;
   let initialY;
   let xOffset = 0;
   let yOffset = 0;
 
-  const dragStart = (e) => {
-    if (e.type === 'touchstart') {
-      initialX = e.touches[0].clientX - xOffset;
-      initialY = e.touches[0].clientY - yOffset;
-    } else {
-      initialX = e.clientX - xOffset;
-      initialY = e.clientY - yOffset;
-    }
+  // Get initial position from element
+  const rect = element.getBoundingClientRect();
+  xOffset = rect.left;
+  yOffset = rect.top;
 
+  const dragStart = (e) => {
     if (e.target === handle || handle.contains(e.target)) {
       isDragging = true;
+      
+      if (e.type === 'touchstart') {
+        initialX = e.touches[0].clientX - xOffset;
+        initialY = e.touches[0].clientY - yOffset;
+      } else {
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+      }
+      
+      handle.style.cursor = 'grabbing';
     }
   };
 
   const dragEnd = () => {
-    initialX = currentX;
-    initialY = currentY;
-    isDragging = false;
+    if (isDragging) {
+      isDragging = false;
+      handle.style.cursor = 'move';
+      
+      // Save position to storage
+      chrome.storage.local.set({
+        timerOverlayPosition: { x: xOffset, y: yOffset }
+      });
+    }
   };
 
   const drag = (e) => {
     if (isDragging) {
       e.preventDefault();
       
-      if (e.type === 'touchmove') {
-        currentX = e.touches[0].clientX - initialX;
-        currentY = e.touches[0].clientY - initialY;
-      } else {
-        currentX = e.clientX - initialX;
-        currentY = e.clientY - initialY;
-      }
+      const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+      
+      currentX = clientX - initialX;
+      currentY = clientY - initialY;
+
+      // Get viewport dimensions
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Get element dimensions
+      const elementWidth = element.offsetWidth;
+      const elementHeight = element.offsetHeight;
+      
+      // Constrain within viewport boundaries
+      const minX = 0;
+      const minY = 0;
+      const maxX = viewportWidth - elementWidth;
+      const maxY = viewportHeight - elementHeight;
+      
+      // Apply constraints
+      currentX = Math.max(minX, Math.min(maxX, currentX));
+      currentY = Math.max(minY, Math.min(maxY, currentY));
 
       xOffset = currentX;
       yOffset = currentY;
 
-      setTranslate(currentX, currentY, element);
+      // Update position
+      element.style.left = currentX + 'px';
+      element.style.top = currentY + 'px';
+      element.style.right = 'auto';
     }
-  };
-
-  const setTranslate = (xPos, yPos, el) => {
-    el.style.transform = `translate(${xPos}px, ${yPos}px)`;
   };
 
   handle.addEventListener('mousedown', dragStart);
@@ -144,5 +175,6 @@ function makeDraggable(element, handle) {
   document.addEventListener('touchmove', drag);
   document.addEventListener('mouseup', dragEnd);
   document.addEventListener('touchend', dragEnd);
+  
+  handle.addEventListener('selectstart', (e) => e.preventDefault());
 }
-
