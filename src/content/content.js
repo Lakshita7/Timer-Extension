@@ -80,7 +80,12 @@ async function showTimer() {
         updateTimerDisplay(response.state);
       }
     } catch (error) {
-      console.error('Error getting initial state:', error);
+      if (error.message.includes('Extension context invalidated')) {
+        console.log('Extension reloaded during initialization');
+        hideTimer();
+      } else {
+        console.error('Error getting initial state:', error);
+      }
     }
   });
 }
@@ -90,6 +95,12 @@ function hideTimer() {
     timerIframe.remove();
     timerIframe = null;
     stopUpdating();
+  }
+  
+  // Also remove drag overlay if it exists
+  const overlay = document.getElementById('timer-drag-overlay');
+  if (overlay) {
+    overlay.remove();
   }
 }
 
@@ -105,7 +116,21 @@ function startUpdating() {
         updateTimerDisplay(response.state);
       }
     } catch (error) {
-      console.error('Error getting timer state:', error);
+      // Extension context invalidated - extension was reloaded
+      if (error.message.includes('Extension context invalidated')) {
+        console.log('Extension reloaded, cleaning up...');
+        stopUpdating();
+        if (timerIframe) {
+          timerIframe.remove();
+          timerIframe = null;
+        }
+        const overlay = document.getElementById('timer-drag-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+      } else {
+        console.error('Error getting timer state:', error);
+      }
     }
   }, 1000);
 }
@@ -211,6 +236,11 @@ function setupDragFunctionality() {
       showTimer();
     }
   } catch (error) {
-    console.error('Error checking initial timer state:', error);
+    if (error.message.includes('Extension context invalidated')) {
+      // Extension was reloaded, do nothing
+      console.log('Extension context invalidated on page load');
+    } else {
+      console.error('Error checking initial timer state:', error);
+    }
   }
 })();

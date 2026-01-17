@@ -6,6 +6,7 @@ let currentState = {
 };
 
 let totalTime = null;
+
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Get references to DOM elements
@@ -27,7 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     } catch (error) {
-      console.error('Error toggling pause:', error);
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.log('Extension context invalidated');
+      } else {
+        console.error('Error toggling pause:', error);
+      }
     }
   });
 
@@ -36,7 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await chrome.runtime.sendMessage({ action: 'resetTimer' });
     } catch (error) {
-      console.error('Error resetting timer:', error);
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.log('Extension context invalidated');
+      } else {
+        console.error('Error resetting timer:', error);
+      }
     }
   });
 
@@ -55,7 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDisplay(response.state);
       }
     } catch (error) {
-      console.error('Error getting initial state:', error);
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.log('Extension context invalidated');
+      } else {
+        console.error('Error getting initial state:', error);
+      }
     }
   })();
 
@@ -67,7 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDisplay(response.state);
       }
     } catch (error) {
-      console.error('Error updating display:', error);
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        // Extension reloaded, stop trying
+        console.log('Extension context invalidated');
+      } else {
+        console.error('Error updating display:', error);
+      }
     }
   }, 1000);
 });

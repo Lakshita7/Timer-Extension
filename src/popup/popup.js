@@ -33,7 +33,12 @@ async function startTimer(duration) {
       duration: duration
     });
   } catch (error) {
-    console.error('Error starting timer:', error);
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      console.log('Extension reloaded, please try again');
+      window.close(); // Close popup
+    } else {
+      console.error('Error starting timer:', error);
+    }
   }
 }
 
@@ -44,7 +49,12 @@ async function stopTimer() {
       action: 'stopTimer'
     });
   } catch (error) {
-    console.error('Error stopping timer:', error);
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      console.log('Extension reloaded, please try again');
+      window.close(); // Close popup
+    } else {
+      console.error('Error stopping timer:', error);
+    }
   }
 }
 
@@ -63,7 +73,12 @@ async function checkTimerState() {
       }
     }
   } catch (error) {
-    console.error('Error getting timer state:', error);
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      // Extension was reloaded, stop checking
+      return;
+    } else {
+      console.error('Error getting timer state:', error);
+    }
   }
 }
 
